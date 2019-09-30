@@ -72,7 +72,8 @@ public class LayoutSimple : Appender.Layout
     }
 }
 
-unittest
+version(LDC) {}
+else unittest
 {
     mstring result = new mstring(2048);
     result.length = 0;

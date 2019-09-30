@@ -271,7 +271,7 @@ public class AppendStream : Appender
     {
         static immutable istring Eol = "\n";
 
-        this.layout.format(event, (in cstring content) { this.stream_.write(content); });
+        this.layout.format(event, (in cstring content) @trusted { this.stream_.write(content); });
         this.stream_.write(Eol);
         if (this.flush_)
             this.stream_.flush;

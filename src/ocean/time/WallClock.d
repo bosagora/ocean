@@ -40,35 +40,6 @@ struct WallClock
 {
     /***************************************************************************
 
-        Returns
-            the current local time
-
-    ***************************************************************************/
-
-    static Time now ()
-    {
-        tm t = void;
-        timeval tv = void;
-        gettimeofday (&tv, null);
-        localtime_r (&tv.tv_sec, &t);
-        tv.tv_sec = timegm (&t);
-        return Clock.convert (tv);
-    }
-
-    /***************************************************************************
-
-        Returns
-            the timezone relative to GMT. The value is negative when west of GMT
-
-    ***************************************************************************/
-
-    static TimeSpan zone ()
-    {
-        return TimeSpan.fromSeconds(-timezone);
-    }
-
-    /***************************************************************************
-
         Set fields to represent a local version of the current UTC time
 
         All values must fall within the domain supported by the OS
