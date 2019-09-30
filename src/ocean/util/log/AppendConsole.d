@@ -17,13 +17,9 @@
 
 module ocean.util.log.AppendConsole;
 
-import ocean.meta.types.Qualifiers;
-
-import ocean.io.Console;
-
-import ocean.io.model.IConduit;
-
+import ocean.transition;
 import ocean.util.log.Appender;
+import ocean.util.log.Event;
 
 /*******************************************************************************
 
@@ -31,28 +27,19 @@ import ocean.util.log.Appender;
 
 *******************************************************************************/
 
-public class AppendConsole : AppendStream
+public class AppendConsole : Appender
 {
+    private Mask mask_;
+
     /***********************************************************************
 
       Create with the given layout
 
      ***********************************************************************/
 
-    this (Appender.Layout how = null)
+    this ()
     {
-        super (Cerr.stream, true, how);
-    }
-
-    /***********************************************************************
-
-     Create with the given stream and layout
-
-     ***********************************************************************/
-
-    this ( OutputStream stream, bool flush = false, Appender.Layout how = null )
-    {
-        super (stream, flush, how);
+        this.mask_ = register(name);
     }
 
     /***********************************************************************
@@ -64,5 +51,19 @@ public class AppendConsole : AppendStream
     override istring name ()
     {
         return this.classinfo.name;
+    }
+
+    /// Return the fingerprint for this class
+    final override Mask mask ()
+    {
+        return this.mask_;
+    }
+
+    /// Append an event to the output.
+    final override void append (LogEvent event)
+    {
+        import std.stdio: write, writeln;
+        this.layout.format(event, (in cstring content) { write(content); });
+        writeln();
     }
 }

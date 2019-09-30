@@ -93,7 +93,7 @@ import ocean.meta.codegen.Identifier;
 
 *******************************************************************************/
 
-public alias void delegate(in cstring) FormatterSink;
+public alias void delegate(in cstring) @safe FormatterSink;
 
 /*******************************************************************************
 
@@ -107,7 +107,7 @@ public alias void delegate(in cstring) FormatterSink;
 
 *******************************************************************************/
 
-private alias void delegate(cstring, ref const(FormatInfo)) ElemSink;
+private alias void delegate(cstring, ref const(FormatInfo)) @safe ElemSink;
 
 
 /*******************************************************************************
@@ -167,7 +167,7 @@ public mstring sformat (Args...) (ref mstring buffer, cstring fmt, Args args)
 /// ditto
 public mstring sformat (Args...) (ref Buffer!(char) buffer, cstring fmt, Args args)
 {
-    scope FormatterSink sink = (in cstring s)
+    scope FormatterSink sink = (in cstring s) @trusted
     {
         buffer ~= s;
     };
@@ -230,12 +230,13 @@ public mstring snformat (Args...) (mstring buffer, cstring fmt, Args args)
 *******************************************************************************/
 
 public bool sformat (Args...) (scope FormatterSink sink, cstring fmt, Args args)
+    @trusted
 {
     FormatInfo info;
     size_t nextIndex;
 
     // A delegate to write elements according to the FormatInfo
-    scope elemSink = (cstring str, ref const(FormatInfo) f)
+    scope ElemSink elemSink = (cstring str, ref const(FormatInfo) f)
     {
         widthSink(sink, str, f);
     };
@@ -300,6 +301,7 @@ public bool sformat (Args...) (scope FormatterSink sink, cstring fmt, Args args)
 *******************************************************************************/
 
 private void widthSink (scope FormatterSink sink, cstring str, ref const(FormatInfo) f)
+    @trusted
 {
     if (f.flags & Flags.Width)
     {

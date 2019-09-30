@@ -22,7 +22,16 @@ public import ocean.stdc.gnu.string;
 
 extern (C):
 
-static if (__VERSION__ < 2089)
+version (Windows)
+{
+    int _strnicmp (scope const char *s1, scope const char *s2, size_t n);
+    alias strncasecmp = _strnicmp;
+    int _stricmp (scope const char *s1, scope const char *s2);
+    alias strcasecmp = _stricmp;
+
+    char* strsignal(int sig);
+}
+else static if (__VERSION__ < 2089)
 {
     char *strsignal(int sig);
     int strcasecmp(in char *s1, in char *s2);
