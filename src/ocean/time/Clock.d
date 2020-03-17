@@ -17,8 +17,7 @@
 
 module ocean.time.Clock;
 
-import core.sys.posix.sys.time;
-import core.sys.posix.time;
+import Phobos = std.datetime;
 import ocean.core.ExceptionDefinitions;
 public import ocean.time.Time;
 
@@ -77,11 +76,7 @@ struct Clock
 
     static Time now ()
     {
-        timeval tv = void;
-        if (gettimeofday (&tv, null))
-            throw new PlatformException ("Clock.now :: Posix timer is not available");
-
-        return convert (tv);
+        return Time(Phobos.Clock.currTime().stdTime);
     }
 
     /***************************************************************************
@@ -97,7 +92,7 @@ struct Clock
 
     /***************************************************************************
 
-        Set fields to represent the provided UTC time.
+        Set fields to represent the provided time.
 
         Note that the conversion is limited by the underlying OS, and will fail
         to operate correctly with Time values beyond the domain, which is
@@ -106,99 +101,22 @@ struct Clock
 
     ***************************************************************************/
 
-    static DateTime toDate (Time time)
+    static DateTime toDate (Time time, immutable Phobos.TimeZone tz = Phobos.UTC())
     {
         DateTime dt = void;
-        auto timeval = convert (time);
-        dt.time.millis = cast(uint) (timeval.tv_usec / 1000);
+        Phobos.SysTime st = Phobos.SysTime(time.ticks(), tz);
 
-        tm t = void;
-        gmtime_r (&timeval.tv_sec, &t);
-
-        dt.date.year    = t.tm_year + 1900;
-        dt.date.month   = t.tm_mon + 1;
-        dt.date.day     = t.tm_mday;
-        dt.date.dow     = t.tm_wday;
+        dt.date.year    = st.year;
+        dt.date.month   = st.month; // +1 ?
+        dt.date.day     = st.day;
+        dt.date.dow     = st.dayOfWeek;
+        dt.date.doy     = st.dayOfYear;
         dt.date.era     = 0;
-        dt.time.hours   = t.tm_hour;
-        dt.time.minutes = t.tm_min;
-        dt.time.seconds = t.tm_sec;
-
-        // Calculate the day-of-year
-        setDoy(dt);
+        dt.time.hours   = st.hour;
+        dt.time.minutes = st.minute;
+        dt.time.seconds = st.second;
+        dt.time.millis  = cast(uint) st.fracSecs.total!"msecs";
 
         return dt;
     }
-
-    /***************************************************************************
-
-        Convert Date fields to Time
-
-        Note that the conversion is limited by the underlying OS, and will fail
-        to operate correctly with Time values beyond the domain, which is
-        01-01-1970 on Linux.
-        Date is limited to millisecond accuracy at best.
-
-    ***************************************************************************/
-
-    static Time fromDate (ref DateTime dt)
-    {
-        tm t = void;
-
-        t.tm_year = dt.date.year - 1900;
-        t.tm_mon  = dt.date.month - 1;
-        t.tm_mday = dt.date.day;
-        t.tm_hour = dt.time.hours;
-        t.tm_min  = dt.time.minutes;
-        t.tm_sec  = dt.time.seconds;
-
-        auto seconds = timegm (&t);
-        return Time.epoch1970 +
-            TimeSpan.fromSeconds(seconds) +
-            TimeSpan.fromMillis(dt.time.millis);
-    }
-
-    /***************************************************************************
-
-        Convert timeval to a Time
-
-    ***************************************************************************/
-
-    package static Time convert (ref timeval tv)
-    {
-        return Time.epoch1970 +
-            TimeSpan.fromSeconds(tv.tv_sec) +
-            TimeSpan.fromMicros(tv.tv_usec);
-    }
-
-    /***************************************************************************
-
-        Convert Time to a timeval
-
-    ***************************************************************************/
-
-    package static timeval convert (Time time)
-    {
-        timeval tv = void;
-
-        TimeSpan span = time - time.epoch1970;
-        assert (span >= TimeSpan.zero);
-        tv.tv_sec  = cast(typeof(tv.tv_sec)) span.seconds;
-        tv.tv_usec = cast(typeof(tv.tv_usec)) (span.micros % 1_000_000L);
-        return tv;
-    }
-}
-
-
-
-unittest
-{
-    auto time = Clock.now;
-    auto clock=Clock.convert(time);
-    test (Clock.convert(clock) is time);
-
-    time -= TimeSpan(time.ticks % TimeSpan.TicksPerSecond);
-    auto date = Clock.toDate(time);
-
-    test (time is Clock.fromDate(date));
 }

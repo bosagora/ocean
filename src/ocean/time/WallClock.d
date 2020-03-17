@@ -17,8 +17,6 @@
 
 module ocean.time.WallClock;
 
-import core.sys.posix.sys.time;
-import core.sys.posix.time;
 import ocean.time.Clock;
 public import ocean.time.Time;
 
@@ -92,73 +90,6 @@ struct WallClock
 
     static DateTime toDate (Time utc)
     {
-        DateTime dt = void;
-        auto timeval = Clock.convert (utc);
-        dt.time.millis = cast(uint) (timeval.tv_usec / 1000);
-
-        tm t = void;
-        localtime_r (&timeval.tv_sec, &t);
-
-        dt.date.year    = t.tm_year + 1900;
-        dt.date.month   = t.tm_mon + 1;
-        dt.date.day     = t.tm_mday;
-        dt.date.dow     = t.tm_wday;
-        dt.date.era     = 0;
-        dt.time.hours   = t.tm_hour;
-        dt.time.minutes = t.tm_min;
-        dt.time.seconds = t.tm_sec;
-
-        Clock.setDoy(dt);
-        return dt;
+        return Clock.toDate(utc, null);
     }
-
-    /***************************************************************************
-
-        Convert Date fields to local time
-
-    ***************************************************************************/
-
-    static Time fromDate (ref DateTime dt)
-    {
-        tm t = void;
-
-        t.tm_year = dt.date.year - 1900;
-        t.tm_mon  = dt.date.month - 1;
-        t.tm_mday = dt.date.day;
-        t.tm_hour = dt.time.hours;
-        t.tm_min  = dt.time.minutes;
-        t.tm_sec  = dt.time.seconds;
-
-        auto seconds = mktime (&t);
-        return Time.epoch1970 + TimeSpan.fromSeconds(seconds)
-            + TimeSpan.fromMillis(dt.time.millis);
-    }
-
-        /***********************************************************************
-
-        ***********************************************************************/
-
-        static Time toLocal (Time utc)
-        {
-                auto mod = utc.ticks % TimeSpan.TicksPerMillisecond;
-                auto date=toDate(utc);
-                return Clock.fromDate(date) + TimeSpan(mod);
-        }
-
-        /***********************************************************************
-
-        ***********************************************************************/
-
-        static Time toUtc (Time wall)
-        {
-                auto mod = wall.ticks % TimeSpan.TicksPerMillisecond;
-                auto date=Clock.toDate(wall);
-                return fromDate(date) + TimeSpan(mod);
-        }
-}
-
-
-static this()
-{
-    tzset();
 }
