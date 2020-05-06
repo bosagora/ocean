@@ -567,3 +567,53 @@ unittest
     // Used to work only with "{:X}", however this limitation was lifted
     assert(format("{X}", 42) == "2A");
 }
+
+
+/*******************************************************************************
+
+    unit tests for `Range`
+
+*******************************************************************************/
+
+unittest
+{
+    // empty range
+    bool[string] empty;
+    test(format("{}", empty.byKey()) == `[]`);
+
+    // range with 1 element
+    bool[string] one;
+    one["A"] = true;
+    test(format("{}", one.byKey()) == `["A"]`);
+
+    // element type is string
+    bool[string] foo;
+    foo["A"] = true;
+    foo["B"] = true;
+    test(format("{}", foo.byKey()) == `["A", "B"]`);
+
+    // element type is int
+    bool[int] bar;
+    bar[0] = true;
+    bar[1] = true;
+    test(format("{}", bar.byKey()) == `[0, 1]`);
+
+    // element type is struct
+    struct Key { int value; }
+    struct Value { string value; }
+    Value[Key] aa;
+
+    aa[Key(1)] = Value("1");
+    aa[Key(2)] = Value("2");
+    aa[Key(3)] = Value("3");
+    aa[Key(4)] = Value("4");
+    aa[Key(5)] = Value("5");
+
+    test(format("{}", aa.byKey()) ==
+        `[{ value: 3 }, { value: 5 }, { value: 4 }, ` ~
+        `{ value: 2 }, { value: 1 }]`);
+
+    test(format("{}", aa.byValue()) ==
+        `[{ value: "3" }, { value: "5" }, { value: "4" }, ` ~
+        `{ value: "2" }, { value: "1" }]`);
+}

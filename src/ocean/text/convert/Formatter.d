@@ -473,7 +473,22 @@ private void handle (T) (T v, FormatInfo f, scope FormatterSink sf, scope ElemSi
         nullWrapper(&v, se(v.toString(), f), se("null", f));
     else static if (is(T == interface))
         handle!(Object)(cast(Object) v, f, sf, se);
-
+    else static if (isForwardRange!T && !isInfinite!T)
+    {
+        Flags old_flag = f.flags;
+        f.flags |= Flags.Nested;
+        sf("[");
+        auto range = v.save;
+        while (!range.empty)
+        {
+            handle(range.front, f, sf, se);
+            range.popFront();
+            if (!range.empty)
+                sf(", ");
+        }
+        sf("]");
+        f.flags = old_flag;
+    }
     // Aggregate should be matched before basic type to avoid
     // `alias this` kicking in. See typedef support for more info.
     else static if (is (T == struct))
@@ -956,4 +971,204 @@ unittest
     static assert(canSwitchOn!string);
     static assert(canSwitchOn!(immutable int));
     static assert(!canSwitchOn!(real));
+}
+
+/*******************************************************************************
+
+    Returns `true` if `R` is an input range
+
+    See_Also:
+        https://github.com/dlang/phobos/blob/
+        418106123d6106efb03b2753bf191215b411ad96/std/range/primitives.d#L124
+
+    Params:
+        R = type to be tested
+    Returns:
+        `true` if R is an input range, `false` if not
+
+*******************************************************************************/
+
+private enum bool isInputRange(R) =
+    is(typeof(R.init) == R)
+    && is(typeof((R r) { return r.empty; }(R.init)) == bool)
+    && is(typeof((return ref R r) => r.front))
+    && !is(typeof((R r) { return r.front; }(R.init)) == void)
+    && is(typeof((R r) => r.popFront));
+
+
+//  Test for isInputRange
+//
+//  See_Also:
+//      https://github.com/dlang/phobos/blob/
+//      418106123d6106efb03b2753bf191215b411ad96/std/range/primitives.d#L180
+@safe unittest
+{
+    struct A {}
+    struct B
+    {
+        void popFront();
+        @property bool empty();
+        @property int front();
+    }
+
+    static assert(!isInputRange!A);
+    static assert( isInputRange!B);
+
+    static struct NotDefaultConstructible
+    {
+        @disable this();
+        void popFront();
+        @property bool empty();
+        @property int front();
+    }
+    static assert( isInputRange!NotDefaultConstructible);
+
+    static struct NotDefaultConstructibleOrCopyable
+    {
+        @disable this();
+        @disable this(this);
+        void popFront();
+        @property bool empty();
+        @property int front();
+    }
+    static assert(isInputRange!NotDefaultConstructibleOrCopyable);
+
+    static struct Frontless
+    {
+        void popFront();
+        @property bool empty();
+    }
+    static assert(!isInputRange!Frontless);
+
+    static struct VoidFront
+    {
+        void popFront();
+        @property bool empty();
+        void front();
+    }
+    static assert(!isInputRange!VoidFront);
+}
+
+//  Test for isInputRange
+//
+//  See_Also:
+//      https://github.com/dlang/phobos/blob/
+//      418106123d6106efb03b2753bf191215b411ad96/std/range/primitives.d#L231
+@safe unittest
+{
+    import std.algorithm.comparison : equal;
+
+    static struct R
+    {
+        static struct Front
+        {
+            R* impl;
+            @property int value() { return impl._front; }
+            alias value this;
+        }
+
+        int _front;
+
+        @property bool empty() { return _front >= 3; }
+        @property auto front() { return Front(&this); }
+        void popFront() { _front++; }
+    }
+    R r;
+
+    static assert(isInputRange!R);
+    assert(r.equal([ 0, 1, 2 ]));
+}
+
+//  Test for isInputRange
+@safe unittest
+{
+    bool[string] foo;
+    foo["A"] = true;
+    foo["B"] = true;
+    static assert (isInputRange!(typeof(foo.byKey())));
+    static assert (isInputRange!(typeof(foo.byValue())));
+}
+
+/*******************************************************************************
+
+    Returns `true` if `R` is a forward range
+
+    See_Also:
+        https://github.com/dlang/phobos/blob/
+        418106123d6106efb03b2753bf191215b411ad96/std/range/primitives.d#L949
+
+    Params:
+        R = type to be tested
+    Returns:
+        `true` if R is an forward range, `false` if not
+
+*******************************************************************************/
+
+private enum bool isForwardRange(R) = isInputRange!R
+    && is(typeof((R r) { return r.save; }(R.init)) == R);
+
+
+//  Test for isForwardRange
+//
+//  See_Also:
+//      https://github.com/dlang/phobos/blob/
+//      418106123d6106efb03b2753bf191215b411ad96/std/range/primitives.d#L990
+@safe unittest
+{
+    struct R14544
+    {
+        int front() { return 0;}
+        void popFront() {}
+        bool empty() { return false; }
+        R14544 save() {return this;}
+    }
+    static assert (isForwardRange!R14544);
+}
+
+//  Test for isForwardRange
+@safe unittest
+{
+    bool[string] foo;
+    foo["A"] = true;
+    foo["B"] = true;
+    static assert (isForwardRange!(typeof(foo.byKey())));
+    static assert (isForwardRange!(typeof(foo.byValue())));
+}
+
+/*******************************************************************************
+
+    Returns `true` if `R` is an infinite input range. An
+    infinite input range is an input range that has a statically-defined
+    enumerated member called `empty` that is always `false`,
+
+    See_Also:
+        https://github.com/dlang/phobos/blob/
+        418106123d6106efb03b2753bf191215b411ad96/std/range/primitives.d#L1608
+
+    Params:
+        R = type to be tested
+    Returns:
+        `true` if R is an infinite input range, `false` if not
+
+*******************************************************************************/
+
+private template isInfinite (R)
+{
+    static if (isInputRange!R && __traits(compiles, { enum e = R.empty; }))
+        enum bool isInfinite = !R.empty;
+    else
+        enum bool isInfinite = false;
+}
+
+//  Test for isInfinite
+@safe unittest
+{
+    struct Sample
+    {
+        int front() { return 0;}
+        void popFront() {}
+        enum bool empty = false;
+    }
+
+    static assert (isInfinite!(Sample));
 }
